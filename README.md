@@ -1,2 +1,2 @@
-# DevLisp
+# Lispy
 A lisp built by following "Build your own lisp" by Daniel Holden
