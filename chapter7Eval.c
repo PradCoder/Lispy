@@ -6,12 +6,15 @@ Windows
 cc -std=c99 -Wall prompts.c mpc.c -prompts
 
 Pesara Amarasekera
-2019-0707
+2019-07-07
 This file contains the program for evaluating the expressions in
 the tree structure
 This is specifically an abstract syntax tree
 
-TODO:   Also finish Bonus questions for chapter 7
+TODO:   Correct the tree functions:
+            long countleaves(mpc_ast_t* t);
+            long countBranches(mpc_ast_t* t);
+            long maxChildBranch(mpc_ast_t* t);
 */
 
 /*
@@ -48,40 +51,30 @@ typedef struct mpc_ast_t {
 #endif
 
 #define max(a,b) (a>b ? a : b)
+#define min(a,b) (a<b ? a : b)
 
 long eval(mpc_ast_t* t);
 long eval_op(long x, char* op, long y);
 long countleaves(mpc_ast_t* t);
 long countBranches(mpc_ast_t* t);
 long maxChildBranch(mpc_ast_t* t);
-long countProperChildren(mpc_ast_t* t);
-
-long countProperChildren(mpc_ast_t* t){
-    int x = 0;
-    int i;
-    for(i=0;i<t->children_num;i++){
-        if(strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")){
-            x++;
-        }
-    }
-    return x;
-}
 
 long maxChildBranch(mpc_ast_t* t){
-    int x1 = 0, x2= 0;
+    int x1 = 0, x2= 0, x3= 0;
     int i;
+    if((strstr(t->tag,"operator")||strstr(t->tag,"expr")) && t->children_num==0){
+            printf("Puts: %s\n",t->contents);
+            return x2 = 1;
+    }
+
     for(i=0;i<t->children_num;i++){
-        if(strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")){
-            printf("Puts: %s\n",t->children[i]->contents);
-            x2 = 1;
-            x1 = max(x2,x1);
-        }
         if((strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")) && (t->children[i]->children_num!=0)){
-            x2+=maxChildBranch(t->children[i]);
-            x1 = max(x2,x1);
+            x2+= 1+ maxChildBranch(t->children[i]);
+            x3 = x1;
+            x1 = x2;
         }
     }
-    return x1;
+    return max(x3,x1);
 }
 
 /*count number of children at each layer*/
@@ -127,6 +120,9 @@ long eval(mpc_ast_t* t){
 
     /*Iterate the remaining children and combining*/
     int i = 3;
+    if(strstr(t->children[i]->tag,"expr") == 0 && strcmp(op,"-") == 0 ){
+        return -x;
+    }
 
     while(strstr(t->children[i]->tag,"expr")){
         x = eval_op(x,op, eval(t->children[i]));
@@ -143,6 +139,8 @@ long eval_op(long x, char* op, long y){
     if ( strcmp(op,"/") == 0 ){ return x/y; }
     if ( strcmp(op,"%") == 0 ){ return x%y; }
     if ( strcmp(op,"^") == 0 ){ return pow(x,y); }
+    if ( strcmp(op,"min") == 0 ){ return min(x,y); }
+    if ( strcmp(op,"max") == 0 ){ return max(x,y); }
     return 0;
 }
 
@@ -156,8 +154,8 @@ int main (int argc, char** argv){
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                                                                   \
     number  : /-?[0-9]+[.]?[0-9]*/;                                                     \
-    operator: '+'|'-'|'*'|'/'|'%'|\"add\"|\"sub\"|\"mul\"|\"div\";                      \
-    expr    : <number>  | '('  <operator> <expr>+ ')';                                  \
+    operator: '+'|'-'|'*'|'/'|'%'|\"min\"|\"max\";                                      \
+    expr : <number>  | '('  <operator> <expr>+ ')';                                     \
     lispy  : /^/ <operator> <expr>+  /$/;                                               \
     ",
     Number, Operator, Expr, Lispy);
