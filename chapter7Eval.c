@@ -1,19 +1,21 @@
 /*
+
 Linux
 cc -std=c99 -Wall prompt.c mpc.c -ledit -lm -o prompt
 Windows
 cc -std=c99 -Wall prompts.c mpc.c -prompts
+
 Pesara Amarasekera
-2018-11-10
+2019-0707
 This file contains the program for evaluating the expressions in
 the tree structure
 This is specifically an abstract syntax tree
 
-TODO:   complete debugging for segmentation fault 
-        Also finish Bonus questions for chapter 7
+TODO:   Also finish Bonus questions for chapter 7
 */
 
-/*The structure inside the header file
+/*
+The structure inside the header file
 
 typedef struct mpc_ast_t {
     char* tag; 
@@ -25,8 +27,6 @@ typedef struct mpc_ast_t {
 
 */
 
-/*#include <stdio.h>
-#include <stdlib.h>*/
 #include "mpc.h"
 #ifdef _WIN32
     #include <string.h>
@@ -47,23 +47,64 @@ typedef struct mpc_ast_t {
     #include <editline/history.h>
 #endif
 
+#define max(a,b) (a>b ? a : b)
+
 long eval(mpc_ast_t* t);
 long eval_op(long x, char* op, long y);
-long countBranches(mpc_ast_t* t);
 long countleaves(mpc_ast_t* t);
+long countBranches(mpc_ast_t* t);
+long maxChildBranch(mpc_ast_t* t);
+long countProperChildren(mpc_ast_t* t);
+
+long countProperChildren(mpc_ast_t* t){
+    int x = 0;
+    int i;
+    for(i=0;i<t->children_num;i++){
+        if(strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")){
+            x++;
+        }
+    }
+    return x;
+}
+
+long maxChildBranch(mpc_ast_t* t){
+    int x1 = 0, x2= 0;
+    int i;
+    for(i=0;i<t->children_num;i++){
+        if(strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")){
+            printf("Puts: %s\n",t->children[i]->contents);
+            x2 = 1;
+            x1 = max(x2,x1);
+        }
+        if((strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")) && (t->children[i]->children_num!=0)){
+            x2+=maxChildBranch(t->children[i]);
+            x1 = max(x2,x1);
+        }
+    }
+    return x1;
+}
 
 /*count number of children at each layer*/
-/*long countBranches(mpc_ast_t* t){
-    return 0;
-}*/
+long countBranches(mpc_ast_t* t){
+    int x = 0;
+    int i;
+    
+    for(i=0;i<t->children_num;i++){
+        if(strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")){
+            x++;
+        }
+        if((strstr(t->children[i]->tag,"operator")||strstr(t->children[i]->tag,"expr")) && (t->children[i]->children_num!=0)){
+            x+=countBranches(t->children[i]);
+        }
+    }
+    return x;
+}
 
-/*count number of children in the last layer*/
 /*count number of children in the last layer*/
 long countLeaves(mpc_ast_t* t){
     int x = 0;
     int i;
-    if(t->children_num==0 && strstr(t->tag,"expr")){
-        printf("Put: %s\n",t->contents);
+    if(t->children_num==0 && (strstr(t->tag,"operator")||strstr(t->tag,"number"))){
         return 1;
     }
     for(i=0;i<t->children_num;i++){
@@ -86,6 +127,7 @@ long eval(mpc_ast_t* t){
 
     /*Iterate the remaining children and combining*/
     int i = 3;
+
     while(strstr(t->children[i]->tag,"expr")){
         x = eval_op(x,op, eval(t->children[i]));
         i++;
@@ -100,6 +142,7 @@ long eval_op(long x, char* op, long y){
     if ( strcmp(op,"*") == 0 ){ return x*y; }
     if ( strcmp(op,"/") == 0 ){ return x/y; }
     if ( strcmp(op,"%") == 0 ){ return x%y; }
+    if ( strcmp(op,"^") == 0 ){ return pow(x,y); }
     return 0;
 }
 
@@ -113,10 +156,9 @@ int main (int argc, char** argv){
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                                                                   \
     number  : /-?[0-9]+[.]?[0-9]*/;                                                     \
-    operator: '+'|'-'|'*'|'/'|'%'|/add/|/sub/|/mul/|/div/;                              \
-    expr    : <number>  | '('  <operator> <expr>+ ')' |                                 \
-    '(' <expr>+ <operator> <expr>+ ')';                                                 \
-    lispy  : /^/ <operator> <expr>+  /$/ | /^/  <expr>+  <operator> <expr>+ /$/;        \
+    operator: '+'|'-'|'*'|'/'|'%'|\"add\"|\"sub\"|\"mul\"|\"div\";                      \
+    expr    : <number>  | '('  <operator> <expr>+ ')';                                  \
+    lispy  : /^/ <operator> <expr>+  /$/;                                               \
     ",
     Number, Operator, Expr, Lispy);
 
@@ -138,7 +180,18 @@ int main (int argc, char** argv){
 
             long result = eval(r.output);
             long numLeaves = countLeaves(r.output);
-            printf("%li %li\n",result,numLeaves);
+            long numBranches = countBranches(r.output);
+            long numMaxChildBranch = maxChildBranch(r.output);
+            
+            puts("#########################################");
+
+            printf("Number of leaves: %li\n",numLeaves);
+            printf("Number of branches: %li\n",numBranches);
+            printf("Number of children in maximum Branch: %li\n",numMaxChildBranch);
+
+            puts("#########################################");
+
+            printf("%li\n",result);
             mpc_ast_delete(r.output);
 
         }else{
