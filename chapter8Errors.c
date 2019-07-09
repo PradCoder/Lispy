@@ -1,5 +1,10 @@
 /*
 
+Linux
+cc -std=c99 -Wall prompt.c mpc.c -ledit -lm -o prompt
+Windows
+cc -std=c99 -Wall prompts.c mpc.c -prompts
+
 Pesara Amarasekera
 2019-07-07
 This file contains the error handling code for Maitri 
@@ -7,6 +12,13 @@ Programming Language
 Watching for Heisenbugs (Mutating Bugs???)
 
 LOOK: valgrind and gdb will come in handy after this point
+
+gdb: you can use gdb when you create an executable with either -g or -ggdb(most expressive debugging information) 
+    flag, then running the executable inside gdb
+
+enum: enums can be named from the start or using typedef
+
+union: a variable that at different times hold different types
 
 */
 
@@ -31,21 +43,25 @@ LOOK: valgrind and gdb will come in handy after this point
     #include <editline/history.h>
 #endif
 
+/*Create Enumeration of number Types*/
+/*enum { NUM_LONG, NUM_DOUBLE};*/
+
 /*Create Enumeration of Possible lval Types*/
 enum { LVAL_NUM, LVAL_ERR };
 
 /*Create Enumeration of Possible Error Types*/
-enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
+enum { LERR_DIV_ZERO, LERR_MOD_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
 
 /*New lval Struct Declaration*/
 typedef struct{
-    int type; 
-    long num; 
+    int type;
+    /* long num;*/
+    double num; 
     int err;
 } lval;
 
 /*Create a new number type lval*/
-lval lval_num(long x){
+lval lval_num(double x /*long x*/){
     lval v;
     v.type = LVAL_NUM;
     v.num = x;
@@ -65,13 +81,16 @@ void lval_print(lval v){
     switch(v.type){
         /*In the case the type is a number print it*/
         /*Then 'break' out of the switch.*/
-        case LVAL_NUM: printf("%li",v.num); break;
+        case LVAL_NUM: printf("%.2lf",v.num)/*printf("%li",v.num)*/; break;
 
         /*In the case the type is an error*/
         case LVAL_ERR:
             /*Check what type of error it is and print it*/
             if(v.err == LERR_DIV_ZERO){
                 printf("Error: Division By Zero!");
+            }
+            if(v.err == LERR_MOD_ZERO){
+                printf("Error: Modulo By Zero!");
             }
             if(v.err == LERR_BAD_OP){
                 printf("Error: Invalid Operator!");
@@ -95,6 +114,11 @@ lval eval_op(lval x, char* op,lval y) {
     if(strcmp(op,"+") == 0) {return lval_num(x.num+y.num);}
     if(strcmp(op,"-") == 0) {return lval_num(x.num-y.num);}
     if(strcmp(op,"*") == 0) {return lval_num(x.num*y.num);}
+    if(strcmp(op,"%") == 0) {
+        return y.num == 0
+        ? lval_err(LERR_MOD_ZERO)
+        : lval_num( (long)(x.num) % (long)(y.num) );
+    }
     if(strcmp(op,"/") == 0) {
         return y.num==0
         ? lval_err(LERR_DIV_ZERO)
@@ -108,7 +132,8 @@ lval eval(mpc_ast_t* t){
 
     if(strstr(t->tag,"number")){
         errno = 0;
-        long x = strtol(t->contents,NULL,10);
+        /*long x = strtol(t->contents,NULL,10);*/
+        double x = atof(t->contents);
         return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
     }
 
@@ -133,7 +158,7 @@ int main(int argc, char** argv){
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                             \
     number : /-?[0-9]+[.]?[0-9]*/;                \
-    operator : '+'|'-'|'*'|'/';                   \
+    operator : '+'|'-'|'*'|'/'|'%';               \
     expr : <number> | '(' <operator> <expr>+ ')'; \
     lispy : /^/ <operator> <expr>+ /$/;           \
     ",
