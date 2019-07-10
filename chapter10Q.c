@@ -44,8 +44,39 @@ typedef struct lval{
     struct lval** cell;
 } lval;
 
-lval*
+/*  Construct a pointer to a new Number lval */
+lval* lval_num(long x){
+    lval* v  = malloc(sizeof(lval));
+    v->type = LVAL_NUM;
+    v->num = x;
+    return v;
+}
 
+/* Construct a pointer to a new Error lval */
+lval* lval_err(char* m){
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_ERR;
+    v->err = malloc(strlen(m)+1);
+    strcpy(v->err,m);
+    return v;
+}
+
+/* Construct a pointer to a new Symbol lval */
+lval* lval_sym(char* s){
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_SYM;
+    v->sym = malloc(strlen(s)+1);
+    strcpy(v->sym,s);
+    return v;
+}
+
+lval* lval_sexpr(void){
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_SEXPR;
+    v->count = 0;
+    v->cell = NULL;
+    return v;
+}
 /* A pointer to a new empty Qexpr lval */
 lval* lval_qexpr(void){
     lval* v = malloc(sizeof(lval));
@@ -53,16 +84,6 @@ lval* lval_qexpr(void){
     v->count = 0;
     v->cell = NULL;
     return v;
-}
-
-void lval_print(lval* v){
-    switch (v->type) {
-        case LVAL_NUM: printf("%li",v->num); break;
-        case LVAL_ERR: printf("Error: %s",v->err); break;
-        case LVAL_SYM: printf("%s", v->sym); break;
-        case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
-        case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
-    }
 }
 
 void lval_del(lval* v){
@@ -84,6 +105,25 @@ void lval_del(lval* v){
     
     free(v);
 }
+
+lval* lval_read_num(mpc_ast_t* t){
+    errno = 0;
+    long x = strtol(t->contents,NULL,10);
+    return errno!= ERANGE ? 
+        lval_num(x) : lval_err("invalid number");
+}
+
+void lval_print(lval* v){
+    switch (v->type) {
+        case LVAL_NUM: printf("%li",v->num); break;
+        case LVAL_ERR: printf("Error: %s",v->err); break;
+        case LVAL_SYM: printf("%s", v->sym); break;
+        case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
+        case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
+    }
+}
+
+
 
 lval* lval_read(mpc_ast_t* t){
     /*If Symbol or Number return conversion to that type*/
