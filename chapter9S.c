@@ -11,6 +11,8 @@ Pesara Amarasekera
 In this file a bigger grammar is added - this is pretty much the 5 iteration of Lispy 
 
 Lisps : Look more into Cons cells and a linked list implementations
+
+TODO: Extend to % and doubles
 */
 
 #include "mpc.h"
@@ -257,6 +259,13 @@ lval* builtin_op( lval* a, char* op){
         if(strcmp(op,"+")==0){ x->num += y->num;}
         if(strcmp(op,"-")==0){ x->num -= y->num;}
         if(strcmp(op,"*")==0){ x->num *= y->num;}
+        if(strcmp(op,"%")==0){
+            if(y->num==0){
+                lval_del(x);lval_del(y);
+                x = lval_err("Modulo By Zero!");break;
+            }
+            x->num %= y->num;
+        }
         if(strcmp(op,"/")==0){
             if(y->num==0){
                 lval_del(x); lval_del(y);
@@ -281,8 +290,8 @@ int main(int argc, char** argv){
 
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                           \
-     number : /-?[0-9]+/ ;                      \
-     symbol : '+'|'-'|'*'|'/' ;                 \
+     number : /-?[0-9]+[.]?[0-9]*/ ;            \
+     symbol : '+'|'-'|'*'|'/'|'%' ;                 \
      sexpr  : '(' <expr>* ')' ;                 \
      expr   : <number> | <symbol> | <sexpr> ;   \
      lispy  : /^/<expr>*/$/ ;                   \
