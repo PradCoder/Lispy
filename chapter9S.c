@@ -12,7 +12,7 @@ In this file a bigger grammar is added - this is pretty much the 5 iteration of 
 
 Lisps : Look more into Cons cells and a linked list implementations
 
-TODO: Extend to % and doubles
+UPDATE: Find method of carrying out two numbers more efficiently
 */
 
 #include "mpc.h"
@@ -40,7 +40,7 @@ enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR };
 
 typedef struct lval{
     int type;
-    long num;
+    double num;
     /*Error and Symbol types have some string data*/
     char* err;
     char* sym;
@@ -57,7 +57,7 @@ lval* lval_eval(lval* v);
 lval* builtin_op( lval* a, char* op);
 
 /*Construct a pointer to a new Number lval*/
-lval* lval_num(long x){
+lval* lval_num(double x){
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_NUM;
     v->num = x;
@@ -114,7 +114,8 @@ void lval_del(lval* v){
 
 lval* lval_read_num(mpc_ast_t* t){
     errno = 0;
-    long x = strtol(t->contents, NULL, 10);
+    /*long x = strtol(t->contents, NULL, 10);*/
+    long x = atof(t->contents);
     return errno != ERANGE ?
         lval_num(x) : lval_err("invalid number");
 }
@@ -163,7 +164,7 @@ void lval_expr_print(lval* v, char open, char close){
 
 void lval_print(lval* v){
     switch(v->type){
-        case LVAL_NUM: printf("%li",v->num);break;
+        case LVAL_NUM: printf("%lf",v->num);break;
         case LVAL_ERR: printf("Error: %s",v->err);break;
         case LVAL_SYM: printf("%s",v->sym);break;
         case LVAL_SEXPR: lval_expr_print(v,'(',')');break;
@@ -264,7 +265,7 @@ lval* builtin_op( lval* a, char* op){
                 lval_del(x);lval_del(y);
                 x = lval_err("Modulo By Zero!");break;
             }
-            x->num %= y->num;
+             x->num = (long) x->num % (long) y->num;
         }
         if(strcmp(op,"/")==0){
             if(y->num==0){
