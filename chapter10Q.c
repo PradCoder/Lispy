@@ -9,6 +9,9 @@ Pesara Amarasekera
 2019-07-09
 
 In this file Quoted Expressions will be implemented
+
+TODO: find cause of the extra () of the expression 
+        if it doesn't take too much time otherwise finish the implementation as shown in the book
 */
 #include "mpc.h"
 #ifdef _WIN32
@@ -43,6 +46,8 @@ typedef struct lval{
     int count;
     struct lval** cell;
 } lval;
+
+void lval_print(lval* v);
 
 /*  Construct a pointer to a new Number lval */
 lval* lval_num(long x){
@@ -109,31 +114,27 @@ void lval_del(lval* v){
 lval* lval_read_num(mpc_ast_t* t){
     errno = 0;
     long x = strtol(t->contents,NULL,10);
-    return errno!= ERANGE ? 
+    return errno != ERANGE ? 
         lval_num(x) : lval_err("invalid number");
 }
 
-void lval_print(lval* v){
-    switch (v->type) {
-        case LVAL_NUM: printf("%li",v->num); break;
-        case LVAL_ERR: printf("Error: %s",v->err); break;
-        case LVAL_SYM: printf("%s", v->sym); break;
-        case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
-        case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
-    }
+lval* lval_add(lval* v,lval* x){
+    v->count++;
+    v->cell = realloc(v->cell,sizeof(lval*) * v->count);
+    v->cell[v->count-1] = x;
+    return v;
 }
-
-
 
 lval* lval_read(mpc_ast_t* t){
     /*If Symbol or Number return conversion to that type*/
     if(strstr(t->tag,"number")) {return lval_read_num(t);}
     if(strstr(t->tag,"symbol")) {return lval_sym(t->contents);}
 
-    /*If root(>) or sexpr then create empty list*/
+    /*If root(>), sexpr, or qexpr then create empty list*/
     lval* x = NULL;
     if(strcmp(t->tag,">") == 0) { x = lval_sexpr();}
     if(strstr(t->tag,"sexpr"))  { x = lval_sexpr();}
+    if(strstr(t->tag,"qexpr"))  { x = lval_qexpr();}
 
     /*Fill this list with any valid expression contained within*/
     for(int i=0;i<t->children_num;i++){
@@ -147,6 +148,32 @@ lval* lval_read(mpc_ast_t* t){
 
     return x;
 }
+
+void lval_expr_print(lval* v,char open, char close){
+    putchar(open);
+    for(int i=0;i<v->count;i++){
+        /*Print value contained within*/
+        lval_print(v->cell[i]);
+
+        /*Don't print trailing space if last element*/
+        if(i != v->count-1){
+            putchar(' ');
+        }
+    }
+    putchar(close);
+}
+
+void lval_print(lval* v){
+    switch (v->type) {
+        case LVAL_NUM: printf("%li",v->num); break;
+        case LVAL_ERR: printf("Error: %s",v->err); break;
+        case LVAL_SYM: printf("%s", v->sym); break;
+        case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
+        case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
+    }
+}
+
+void lval_println(lval* v){lval_print(v); putchar('\n');}
 
 int main(int argc, char** argv){
     mpc_parser_t* Number = mpc_new("number");
@@ -167,6 +194,25 @@ int main(int argc, char** argv){
     ",
     Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
 
+    puts("Lispy version 0.0.0.0.6");
+    puts("Press Ctrl-c to Exit\n");
+
+    while(1){
+        mpc_result_t r;
+        char* input  = readline("Input> ");
+        add_history(input);
+
+        if(mpc_parse("<stdin>",input,Lispy,&r)){
+            lval* x = lval_read(r.output);
+            lval_println(x);
+            lval_del(x);
+            mpc_ast_delete(r.output);
+        }else{
+            mpc_err_print(r.error);
+            mpc_err_delete(r.error);
+        }
+        free(input);
+    }
 
     mpc_cleanup(6,Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
     return 0;
