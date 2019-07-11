@@ -10,8 +10,8 @@ Pesara Amarasekera
 
 In this file Quoted Expressions will be implemented
 
-TODO: find cause of the extra () of the expression 
-        if it doesn't take too much time otherwise finish the implementation as shown in the book
+TODO: ADD more Macros for clarity
+      ADD more builtin functions
 */
 #include "mpc.h"
 #ifdef _WIN32
@@ -33,6 +33,9 @@ TODO: find cause of the extra () of the expression
     #include <editline/readline.h>
     #include <editline/history.h>
 #endif
+#define LASSERT(args, cond, err) \
+    if(!(cond)){lval_del(args); return lval_err(err);}
+
 
 enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
 
@@ -199,6 +202,15 @@ lval* lval_take(lval* v, int i){
     return x;
 }
 
+lval* lval_join(lval* x, lval* y){
+    /*For each cell in 'y' add it to 'x'*/
+    while(y->count){
+        x = lval_add(x,lval_pop(y,0));
+    }
+    lval_del(y);
+    return x;
+}
+
 lval* builtin_op(lval* a,char* op){
     /* Ensure all arguments are numbers */
     for(int i=0;i<a->count;i++){
@@ -220,7 +232,6 @@ lval* builtin_op(lval* a,char* op){
     while(a->count > 0){
         /*Pop the next element*/
         lval* y = lval_pop(a,0);
-        if(strcmp(op,"+")==0){x->num+=y->num;}
         if(strcmp(op,"+")==0){ x->num += y->num;}
         if(strcmp(op,"-")==0){ x->num -= y->num;}
         if(strcmp(op,"*")==0){ x->num *= y->num;}
@@ -242,6 +253,84 @@ lval* builtin_op(lval* a,char* op){
     }
 
     lval_del(a); return x;
+}
+
+lval* builtin_head(lval* a){
+    /*Check Error Conditions*/
+    LASSERT(a,a->count == 1,
+        "Function 'head' passed too many arguments!");
+    LASSERT(a,a->cell[0]->type == LVAL_QEXPR,
+        "Function 'head' passed incorrect type!");
+    LASSERT(a,a->cell[0]->count != 0,
+        "Function 'head' passed {}!");
+
+    /* Otherwise take first argument */
+    lval* v = lval_take(a,0);
+
+    /* Delete all elements that are not head and return */
+    while(v->count > 1) {lval_del(lval_pop(v,1));}
+    return v;
+}
+
+lval* builtin_tail(lval* a){
+    /* Check Error Conditions */
+    LASSERT(a,a->count == 1,
+        "Function 'tail' passed too many arguments!");
+    LASSERT(a,a->cell[0]->type == LVAL_QEXPR,
+        "Function 'tail' passed incorrect type!");
+    LASSERT(a,a->cell[0]->count != 0,
+        "Function 'tail' passed {}");
+
+    /* Take first argument */
+    lval* v = lval_take(a,0);
+
+    /* Delete first element and return */
+    lval_del(lval_pop(v,0));
+    return v;
+}
+
+lval* builtin_list(lval* a){
+    a->type = LVAL_QEXPR;
+    return a;
+}
+
+lval* builtin_join(lval* a){
+    
+    for(int i = 0;i<a->count;i++){
+        LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
+            "Function 'join' passed incorrect type.");
+    }
+
+    lval* x = lval_pop(a,0);
+
+    while(a->count){
+        x = lval_join(x, lval_pop(a,0));
+    }
+
+    lval_del(a);
+    return x;
+}
+
+lval* builtin_eval(lval* a){
+    LASSERT(a,a->count == 1,
+        "Function 'eval' passed too many arguments!");
+    LASSERT(a,a->cell[0]->type == LVAL_QEXPR,
+        "Function 'eval' passed incorrect type");
+    
+    lval* x = lval_take(a,0);
+    x->type = LVAL_SEXPR;
+    return lval_eval(x);
+}
+
+lval* builtin(lval* a, char* func){
+    if(strcmp("list",func)==0){return builtin_list(a);}
+    if(strcmp("head",func)==0){return builtin_head(a);}
+    if(strcmp("tail",func)==0){return builtin_tail(a);}
+    if(strcmp("join",func)==0){return builtin_join(a);}
+    if(strcmp("eval",func)==0){return builtin_eval(a);}
+    if(strstr("+-/*%",func)){return builtin_op(a,func);}
+    lval_del(a);
+    return lval_err("Unknown Function!");
 }
 
 lval* lval_eval_sexpr(lval* v){
@@ -269,7 +358,7 @@ lval* lval_eval_sexpr(lval* v){
     }
 
     /* Call builtin with operator */
-    lval* result = builtin_op(v,f->sym);
+    lval* result = builtin(v,f->sym);
     lval_del(f);
 
     return result;
@@ -311,7 +400,7 @@ int main(int argc, char** argv){
         add_history(input);
 
         if(mpc_parse("<stdin>",input,Lispy,&r)){
-            lval* x = lval_read(r.output);
+            lval* x = lval_eval(lval_read(r.output));
             lval_println(x);
             lval_del(x);
             mpc_ast_delete(r.output);
