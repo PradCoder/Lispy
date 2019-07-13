@@ -329,7 +329,7 @@ lval* builtin_cons(lval* a){
         x = lval_join(x,lval_pop(a,0));
     }
     lval_del(a);
-    return a;
+    return x;
 }
 
 lval* builtin_len(lval* a){
@@ -338,11 +338,18 @@ lval* builtin_len(lval* a){
             "Function 'len' passed incorrect type!");
     }
 
+    int i = 0;
+    long count = 0;
+    while(a->cell[i]->count){
+        count += a->cell[i]->count;
+        i++;
+    }
+    lval* x = lval_num(count);
     lval_del(a);
-    return a->count;
+    return x;
 }
 
-lval* builtin_len(lval* a){
+lval* builtin_init(lval* a){
     for(int i=0;i<a->count;i++){
         LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
             "Function 'init' passed incorrect type!");
