@@ -33,9 +33,15 @@ TODO: ADD more Macros for clarity
     #include <editline/readline.h>
     #include <editline/history.h>
 #endif
-#define LASSERT(args, cond, err) \
+
+#define LASSERT(args, cond, err)                                                                    \
     if(!(cond)){lval_del(args); return lval_err(err);}
 
+
+#define INCORRECTNUMARGS(args)                                                                     \
+    if(args->count != 1){lval_del(args);return lval_err("Function passed too many arguments!");}
+#define EMPTYLIST(args)                                                                            \
+    if(args->cell[0]->count == 0){lval_del(args);return lval_err("Function passed {}!");}
 
 enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
 
@@ -279,7 +285,7 @@ lval* builtin_tail(lval* a){
     LASSERT(a,a->cell[0]->type == LVAL_QEXPR,
         "Function 'tail' passed incorrect type!");
     LASSERT(a,a->cell[0]->count != 0,
-        "Function 'tail' passed {}");
+        "Function 'tail' passed {}!");
 
     /* Take first argument */
     lval* v = lval_take(a,0);
@@ -298,7 +304,7 @@ lval* builtin_join(lval* a){
     
     for(int i = 0;i<a->count;i++){
         LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
-            "Function 'join' passed incorrect type.");
+            "Function 'join' passed incorrect type!");
     }
 
     lval* x = lval_pop(a,0);
@@ -311,6 +317,41 @@ lval* builtin_join(lval* a){
     return x;
 }
 
+lval* builtin_cons(lval* a){
+    for(int i=0;i<a->count-1;i++){
+        LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
+            "Function 'cons' passed incorrect type!");
+    }
+
+    lval* x = lval_pop(a,a->count-1);
+
+    while(a->count){
+        x = lval_join(x,lval_pop(a,0));
+    }
+    lval_del(a);
+    return a;
+}
+
+lval* builtin_len(lval* a){
+    for(int i=0;i<a->count;i++){
+        LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
+            "Function 'len' passed incorrect type!");
+    }
+
+    lval_del(a);
+    return a->count;
+}
+
+lval* builtin_len(lval* a){
+    for(int i=0;i<a->count;i++){
+        LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
+            "Function 'init' passed incorrect type!");
+    }
+    
+    lval* x = lval_pop(a,a->count-1);
+    lval_del(x);
+    return a;
+}
 lval* builtin_eval(lval* a){
     LASSERT(a,a->count == 1,
         "Function 'eval' passed too many arguments!");
@@ -327,6 +368,9 @@ lval* builtin(lval* a, char* func){
     if(strcmp("head",func)==0){return builtin_head(a);}
     if(strcmp("tail",func)==0){return builtin_tail(a);}
     if(strcmp("join",func)==0){return builtin_join(a);}
+    if(strcmp("cons",func)==0){return builtin_cons(a);}
+    if(strcmp("len",func)==0){return builtin_len(a);}
+    if(strcmp("init",func)==0){return builtin_init(a);}
     if(strcmp("eval",func)==0){return builtin_eval(a);}
     if(strstr("+-/*%",func)){return builtin_op(a,func);}
     lval_del(a);
@@ -383,7 +427,8 @@ int main(int argc, char** argv){
     "                                                       \
         number : /-?[0-9]+/ ;                               \
         symbol : \"list\"|\"head\"|\"tail\"                 \
-               |\"join\"|\"eval\"|'+'|'-'|'*'|'/'|'%' ;     \
+               |\"join\"|\"cons\"|\"len\"|\"init\"|\"eval\" \
+               |'+'|'-'|'*'|'/'|'%' ;                       \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
         expr   :  <number> | <symbol> | <sexpr> | <qexpr> ; \
