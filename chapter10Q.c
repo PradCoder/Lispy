@@ -10,8 +10,7 @@ Pesara Amarasekera
 
 In this file Quoted Expressions will be implemented
 
-TODO: ADD more Macros for clarity
-      ADD more builtin functions
+TODO: Correct builtin_len, lval_len, builtin_init and lval_init;
 */
 #include "mpc.h"
 #ifdef _WIN32
@@ -217,6 +216,27 @@ lval* lval_join(lval* x, lval* y){
     return x;
 }
 
+long lval_len(lval* y){
+
+    long x = 0;
+    while(y->count){
+        lval* temp = lval_pop(y,0);
+        x += (long) (temp->count); 
+        lval_del(temp);
+    }
+
+    lval_del(y);
+    return x;
+}
+
+lval* lval_init(lval* x, lval* y){
+    while(y->count-1>0){
+        x = lval_add(x,lval_pop(y,0));
+    }
+    lval_del(y);
+    return x;
+}
+
 lval* builtin_op(lval* a,char* op){
     /* Ensure all arguments are numbers */
     for(int i=0;i<a->count;i++){
@@ -301,7 +321,6 @@ lval* builtin_list(lval* a){
 }
 
 lval* builtin_join(lval* a){
-    
     for(int i = 0;i<a->count;i++){
         LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
             "Function 'join' passed incorrect type!");
@@ -318,16 +337,23 @@ lval* builtin_join(lval* a){
 }
 
 lval* builtin_cons(lval* a){
-    for(int i=0;i<a->count-1;i++){
-        LASSERT(a,a->cell[i]->type == LVAL_QEXPR,
+    for(int i=0;i<a->count;i++){
+        LASSERT(a,a->cell[i]->type != LVAL_ERR,
             "Function 'cons' passed incorrect type!");
     }
 
-    lval* x = lval_pop(a,a->count-1);
+    lval* x = NULL;
+    if(a->cell[0]->type != LVAL_QEXPR){
+        x = lval_qexpr();
+        lval_add(x,lval_pop(a,0));
+    }else{
+        x = lval_pop(a,0);
+    }
 
     while(a->count){
         x = lval_join(x,lval_pop(a,0));
     }
+
     lval_del(a);
     return x;
 }
@@ -338,15 +364,15 @@ lval* builtin_len(lval* a){
             "Function 'len' passed incorrect type!");
     }
 
-    int i = 0;
-    long count = 0;
-    while(a->cell[i]->count){
-        count += a->cell[i]->count;
-        i++;
+    long x = 0;
+
+    while(a->count){
+        x += lval_len(lval_pop(a,0));
     }
-    lval* x = lval_num(count);
+
+    lval* y = lval_num(x);
     lval_del(a);
-    return x;
+    return y;
 }
 
 lval* builtin_init(lval* a){
@@ -355,10 +381,17 @@ lval* builtin_init(lval* a){
             "Function 'init' passed incorrect type!");
     }
     
-    lval* x = lval_pop(a,a->count-1);
-    lval_del(x);
-    return a;
+    lval* x = NULL;
+    x = lval_init(x,lval_pop(a,0));
+
+    while(a->count){
+        x = lval_init(x,lval_pop(a,0));
+    }
+
+    lval_del(a);
+    return x;
 }
+
 lval* builtin_eval(lval* a){
     LASSERT(a,a->count == 1,
         "Function 'eval' passed too many arguments!");
