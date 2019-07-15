@@ -11,9 +11,11 @@ Pesara Amarasekera
 In this file the concept of function pointers in c is introduced
 TODO: check lval_err
       check builtin_cons
+      Chapter Exercises (getting more fancy this time around)
 */
 
 #include "mpc.h"
+
 #ifdef _WIN32
     #include <string.h>
     static char buffer[2048]
@@ -32,12 +34,38 @@ TODO: check lval_err
     #include <editline/readline.h>
     #include <editline/history.h>
 #endif
+
 #define LASSERT(args, cond, fmt, ...) \
     if(!(cond)){ \
         lval* err = lval_err(fmt, ##__VA_ARGS__); \
         lval_del(args); \
         return err; \
     } 
+
+#define INCORRECTNUMARGS(args,func,expec)\
+    if(args->count != count){\
+        lval* err = lval_err("Function '%s' passed too many arguments. " \
+                            "Got %i, Expected %i", \
+                            func, args->count, expec);\
+        lval_del(args); \
+        return err;\
+    }
+
+#define EMPTYLIST(args,func) \
+    if(args->cell[0]->count == 0){\
+    lval* err = lval_err("Function '%s' passed {}. ", func);\
+    lval_del(args);\
+    return err\
+    }
+
+#define INCORRECTYPE(args, func, num, type) \
+    if(args->cell[num]->type != type){ \
+        lval* err = lval_err("Function '%s' passed incorrect type for argument %i." \
+                            "Got %s, Expected %s.",  \
+                            func, num,ltype_name(args->cell[num]->type), ltype_name(type)); \
+        lval_del(args); \
+        return err;\
+    }
 
 /* Forward Declarations */
 struct lval;
@@ -712,6 +740,7 @@ int main(int argc, char** argv){
 
         free(input);
     }
+
     lenv_del(e);
     mpc_cleanup(6,Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
     return 0;
