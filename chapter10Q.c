@@ -336,8 +336,7 @@ lval* builtin_join(lval* a){
 lval* builtin_cons(lval* a){
     LASSERT(a,a->count == 2,
         "Function 'cons' passed too many arguments!");
-    LASSERT(a,
-        (a->cell[0]->type == LVAL_QEXPR || a->cell[0]->type == LVAL_SEXPR || a->cell[0]->type == LVAL_NUM || a->cell[0]->type == LVAL_SYM),
+    LASSERT(a,a->cell[0]->type != LVAL_ERR,
         "Function 'cons' passed incorrect type!");
     LASSERT(a,a->cell[1]->type == LVAL_QEXPR,
         "Function 'cons' passed incorrect type!");
