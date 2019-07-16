@@ -12,6 +12,8 @@ In this file the concept of function pointers in c is introduced
 TODO: check lval_err
       check builtin_cons
       Chapter Exercises (getting more fancy this time around)
+      Revamping a lot is in order
+
 */
 
 #include "mpc.h"
@@ -88,7 +90,7 @@ struct lval{
     lbuiltin fun;
     /* Count and Pointer to a list of "lval" */
     int count;
-    struct lval** cell;
+    lval** cell;
 };
 
 struct lenv{
@@ -386,6 +388,7 @@ void lenv_put(lenv* e, lval* k, lval* v){
         if(strcmp(e->syms[i],k->sym) == 0){
             lval_del(e->vals[i]);
             e->vals[i] = lval_copy(v);
+            e->vals[i]->sym = k->sym;
             return;
         }
     }
@@ -397,6 +400,7 @@ void lenv_put(lenv* e, lval* k, lval* v){
 
     /* Copy contents of lval and symbol string into new location */
     e->vals[e->count-1] = lval_copy(v);
+    e->vals[e->count-1]->sym = k->sym;
     e->syms[e->count-1] = malloc(strlen(k->sym)+1);
     strcpy(e->syms[e->count-1],k->sym);
 }
