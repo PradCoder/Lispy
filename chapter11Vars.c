@@ -12,6 +12,8 @@ In this file the concept of function pointers in c is introduced
 TODO: check lval_err
       check builtin_cons
       Chapter Exercises (getting more fancy this time around)
+      Revamping a lot is in order
+
 */
 
 #include "mpc.h"
@@ -88,7 +90,7 @@ struct lval{
     lbuiltin fun;
     /* Count and Pointer to a list of "lval" */
     int count;
-    struct lval** cell;
+    lval** cell;
 };
 
 struct lenv{
@@ -157,8 +159,10 @@ lval* lval_qexpr(void){
     return v;
 }
 
-lval* lval_fun(lbuiltin func){
+lval* lval_fun(lbuiltin func, char *s){
     lval* v = malloc(sizeof(lval));
+    v->sym = malloc(strlen(s)+1);
+    strcpy(v->sym,s);
     v->type = LVAL_FUN;
     v->fun = func;
     return v;
@@ -167,7 +171,7 @@ lval* lval_fun(lbuiltin func){
 void lval_del(lval* v){
     switch (v->type){
         case LVAL_NUM: break;
-        case LVAL_FUN: break;
+        case LVAL_FUN: free(v->sym); break;
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
 
@@ -192,7 +196,11 @@ lval* lval_copy(lval* v){
 
     switch (v->type){
         /* Copy Functions and Numbers Directly */
-        case LVAL_FUN: x->fun = v->fun; break;
+        case LVAL_FUN: 
+        x->fun = v->fun; 
+        x->sym = malloc(strlen(v->sym)+1);
+        strcpy(x->sym,v->sym);
+        break;
         case LVAL_NUM: x->num = v->num; break;
 
         /* Copy Strings using malloc and strcpy */
@@ -276,10 +284,17 @@ void lval_print(lval* v){
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
         case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
-        case LVAL_FUN: printf("<function>"); break;
+        case LVAL_FUN: printf("<%s>",v->sym);break;
     }
 }
 
+void print_env(lenv* e){
+    printf("Environment Variables\n");
+    for(int i = 0;i<e->count;i++){
+        printf("    %s\n",e->syms[i]);
+    }
+    putchar('\n');
+}
 void lval_println(lval* v){lval_print(v); putchar('\n');}
 
 lval* lval_pop(lval* v, int i){
@@ -414,14 +429,22 @@ lval* builtin_def(lenv* e, lval* a){
     for(int i=0;i<syms->count;i++){
         LASSERT(a,syms->cell[i]->type == LVAL_SYM,
             "Function 'def' cannot define non-symbol");
+        
+        /* If symbol is builtin return error */
+        printf("%s\n",syms->cell[i]->sym);
+        LASSERT(a,(strcmp("list",syms->cell[i]->sym) != 0 && strcmp("head",syms->cell[i]->sym) != 0 && strcmp("tail",syms->cell[i]->sym) != 0 &&
+            strcmp("eval",syms->cell[i]->sym) != 0 && strcmp("join",syms->cell[i]->sym) != 0 && strcmp("cons",syms->cell[i]->sym) != 0 &&
+            strcmp("init",syms->cell[i]->sym) != 0 && strcmp("len",syms->cell[i]->sym) != 0 && strcmp("def",syms->cell[i]->sym) != 0 &&
+            strcmp("head",syms->cell[i]->sym) != 0 && strcmp("+",syms->cell[i]->sym) != 0 && strcmp("-",syms->cell[i]->sym) != 0 &&
+            strcmp("*",syms->cell[i]->sym) != 0 && strcmp("/",syms->cell[i]->sym) != 0 && strcmp("%",syms->cell[i]->sym) != 0),
+            "Redefinition of '%s' is not allowed",syms->cell[i]->sym);
     }
 
     /* Check correct number of symbols and values */
     LASSERT(a, syms->count == a->count-1,
         "Function 'def' cannot define incorrect "
         "number of values to symbols");
-    
-    /* Assign copies of values to symbols */
+
     for(int i =0;i<syms->count;i++){
         lenv_put(e,syms->cell[i],a->cell[i+1]);
     }
@@ -637,7 +660,7 @@ lval* builtin_eval(lenv* e, lval* a){
 
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func){
     lval* k = lval_sym(name);
-    lval* v = lval_fun(func);
+    lval* v = lval_fun(func, name);
     lenv_put(e,k,v);
     lval_del(k);lval_del(v);
 }
@@ -649,6 +672,9 @@ void lenv_add_builtins(lenv* e){
     lenv_add_builtin(e, "tail", builtin_tail);
     lenv_add_builtin(e, "eval", builtin_eval);
     lenv_add_builtin(e, "join", builtin_join);
+    lenv_add_builtin(e, "cons", builtin_cons);
+    lenv_add_builtin(e, "init", builtin_init);
+    lenv_add_builtin(e, "len", builtin_len);
     lenv_add_builtin(e, "def", builtin_def);
 
     /*Mathematical Functions*/
@@ -656,6 +682,7 @@ void lenv_add_builtins(lenv* e){
     lenv_add_builtin(e,"-",builtin_sub);
     lenv_add_builtin(e,"*",builtin_mul);
     lenv_add_builtin(e,"/",builtin_div);
+    lenv_add_builtin(e,"%",builtin_mod);
 }
 
 lval* lval_eval_sexpr(lenv* e,lval* v){
@@ -695,6 +722,10 @@ lval* lval_eval(lenv* e, lval* v){
     return v;
 }
 
+int ext(void){
+    return 0;
+}
+
 int main(int argc, char** argv){
     mpc_parser_t* Number = mpc_new("number");
     mpc_parser_t* Symbol = mpc_new("symbol");
@@ -720,15 +751,24 @@ int main(int argc, char** argv){
     puts("Lispy version 0.0.0.0.7"); 
     puts("Press Ctrl-c to Exit\n");
 
-    while(1){
+    int state =  1;
 
+    while(state){
+        print_env(e);
         mpc_result_t r;
         char* input  = readline("Input> ");
         add_history(input);
 
+        if(strcmp(input,"exit")==0){
+            state = ext();
+            free(input);
+            continue;
+        }
+
         if(mpc_parse("<stdin>",input,Lispy,&r)){
 
             lval* x = lval_eval(e, lval_read(r.output));
+
             lval_println(x);
             lval_del(x);
 
@@ -743,5 +783,6 @@ int main(int argc, char** argv){
 
     lenv_del(e);
     mpc_cleanup(6,Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    exit(0);
     return 0;
 }
