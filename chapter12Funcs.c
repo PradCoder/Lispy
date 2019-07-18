@@ -10,7 +10,9 @@ Pesara Amarasekera
 
 In this file functions are designed
 
-TODO: Update custom builtin functionality
+TODO: 
+    Update custom builtin functionality
+    Work on the already built parts of the language
 */
 
 #include "mpc.h"
@@ -115,6 +117,7 @@ lval* lval_join(lval* x, lval* y);
 long lval_len(lval* y);
 lval* lval_init(lval* x, lval* y);
 char* ltype_name(int t);
+
 lenv* lenv_new(void);
 void lenv_del(lenv* e);
 lval* lval_lambda(lval* formals, lval* body);
@@ -123,6 +126,7 @@ lenv* lenv_copy(lenv* e);
 void lenv_put(lenv* e, lval* k, lval* v);
 void lenv_def(lenv* e,lval* k, lval* v);
 lval* lval_call(lenv* e, lval* f, lval* a);
+
 lval* builtin_var(lenv* e, lval* a, char* func);
 lval* builtin_def(lenv* e, lval* a);
 lval* builtin_put(lenv* e, lval* a);
@@ -212,32 +216,6 @@ lval* lval_fun(lbuiltin func){
     return v;
 }
 
-void lval_del(lval* v){
-    switch (v->type){
-        case LVAL_NUM: break;
-        case LVAL_FUN: 
-            if(!v->builtin){
-                lenv_del(v->env);
-                lval_del(v->formals);
-                lval_del(v->body);
-            }
-        break;
-        case LVAL_ERR: free(v->err); break;
-        case LVAL_SYM: free(v->sym); break;
-
-        /*If Qexpr or Sexpr then delete all elements inside*/
-        case LVAL_QEXPR:
-        case LVAL_SEXPR:
-            for(int i=0;i<v->count;i++){
-                lval_del(v->cell[i]);
-            }
-            /* Also free the memory allocated to contain the pointers */
-            free(v->cell);
-        break; 
-    }
-    free(v);
-}
-
 lval* lval_copy(lval* v){
 
     lval* x = malloc(sizeof(lval));
@@ -277,6 +255,32 @@ lval* lval_copy(lval* v){
         break;
     }
     return x;
+}
+
+void lval_del(lval* v){
+    switch (v->type){
+        case LVAL_NUM: break;
+        case LVAL_FUN: 
+            if(!v->builtin){
+                lenv_del(v->env);
+                lval_del(v->formals);
+                lval_del(v->body);
+            }
+        break;
+        case LVAL_ERR: free(v->err); break;
+        case LVAL_SYM: free(v->sym); break;
+
+        /*If Qexpr or Sexpr then delete all elements inside*/
+        case LVAL_QEXPR:
+        case LVAL_SEXPR:
+            for(int i=0;i<v->count;i++){
+                lval_del(v->cell[i]);
+            }
+            /* Also free the memory allocated to contain the pointers */
+            free(v->cell);
+        break; 
+    }
+    free(v);
 }
 
 lval* lval_read_num(mpc_ast_t* t){
@@ -533,6 +537,23 @@ lval* lval_call(lenv* e, lval* f, lval* a){
         /* Pop the first symbol from the formals */
         lval* sym = lval_pop(f->formals, 0);
 
+        /* Special Case to deal with '&' */
+        if(strcmp(sym->sym,"&") == 0){
+
+            /* Ensure '&' is followed by another symbol */
+            if(f->formals->count != 1){
+                lval_del(a);
+                return lval_err("Function format invalid. "
+                    "Symbol '&' not followed by single symbol.");
+            }
+
+            /* Next formal should be bound to remaining arguments */
+            lval* nsym = lval_pop(f->formals,0);
+            lenv_put(f->env, nsym, builtin_list(e,a));
+            lval_del(sym); lval_del(nsym);
+            break;
+        }
+
         /* Pop the next argument from the list */
         lval* val = lval_pop(a,0);
 
@@ -545,6 +566,28 @@ lval* lval_call(lenv* e, lval* f, lval* a){
 
     /* Argument list is now bound so can be cleaned up */
     lval_del(a);
+
+    /*If & remains in formal list bind to empty list */
+    if(f->formals->count > 0 &&
+        strcmp(f->formals->cell[0]->sym, "&") == 0){
+        
+        /* Check to ensure that & is not passed invalidly. */
+        if(f->formals->count != 2){
+            return lval_err("Function format invalid. "
+                "Symbol '&' not followed by single symbol.");
+        }
+
+        /* Pop and delete '&' symbol */
+        lval_del(lval_pop(f->formals,0));
+
+        /* Pop next symbol and create empty list */
+        lval* sym = lval_pop(f->formals, 0);
+        lval* val = lval_qexpr();
+
+        /* Bind to environment and delete */
+        lenv_put(f->env, sym, val);
+        lval_del(sym); lval_del(val);
+    }
 
     /* If all formals have been bound evaluate */
     if(f->formals->count == 0){
