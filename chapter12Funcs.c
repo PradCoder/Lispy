@@ -9,11 +9,6 @@ Pesara Amarasekera
 2019-07-17
 
 In this file functions are designed
-
-TODO: 
-    Update custom builtin functionality
-    Work on the already built parts of the language
-    FIND CORRUPTION ERROR on builtin_fun
 */
 
 #include "mpc.h"
@@ -526,6 +521,13 @@ lval* lval_call(lenv* e, lval* f, lval* a){
     /* Record Argument Counts */
     int given = a->count;
     int total = f->formals->count;
+
+    /* If variable number of arguments are to be passed check if there is at least 1 of those*/
+    if( (total-2>=0) && strcmp(f->formals->cell[total-2]->sym,"&") == 0 && given < (total-1)){
+        lval_del(a);
+        return lval_err("Function format invalid. "
+            "Function not called with proper number of arguments");
+    }    
 
     /* While arguments still remain to be processed */
     while(a->count){
