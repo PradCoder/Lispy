@@ -634,7 +634,7 @@ lval* builtin_var(lenv* e, lval* a, char* func){
             strcmp("init",syms->cell[i]->sym) != 0 && strcmp("len",syms->cell[i]->sym) != 0 && strcmp("def",syms->cell[i]->sym) != 0 &&
             strcmp("head",syms->cell[i]->sym) != 0 && strcmp("+",syms->cell[i]->sym) != 0 && strcmp("-",syms->cell[i]->sym) != 0 &&
             strcmp("*",syms->cell[i]->sym) != 0 && strcmp("/",syms->cell[i]->sym) != 0 && strcmp("%",syms->cell[i]->sym) != 0 &&
-            strcmp("=",syms->cell[i]->sym) != 0 && strcmp("\\",syms->cell[i]->sym) != 0),
+            strcmp("=",syms->cell[i]->sym) != 0 && strcmp("\\",syms->cell[i]->sym) != 0 && strcmp("fun",syms->cell[i]->sym) != 0),
             "Redefinition of '%s' is not allowed",syms->cell[i]->sym);
 
             lenv_def(e, syms->cell[i], a->cell[i+1]);
@@ -944,6 +944,7 @@ lval* lval_eval(lenv* e, lval* v){
         lval_del(v);
         return x;
     }
+    
     if(v->type == LVAL_SEXPR){ return lval_eval_sexpr(e, v);}
     return v;
 }
