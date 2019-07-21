@@ -8,7 +8,7 @@ cc -std=c99 -Wall -ggdb prompts.c mpc.c -prompts
 valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./chapter12Funcs
 
 Pesara Amarasekera
-2019-07-20
+2019-07-21
 
 In this file functions conditionals are designed
 */
@@ -65,7 +65,7 @@ typedef struct lval lval;
 typedef struct lenv lenv;
 
 enum { LVAL_ERR, LVAL_NUM, LVAL_SYM,
-       LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR };
+       LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR, LVAL_BOOL };
 
 typedef lval* (*lbuiltin) (lenv*, lval*);
 
@@ -74,6 +74,7 @@ struct lval{
 
     /* Basic */
     long num;
+    short bool;
     char* sym;
     char* err;
 
@@ -148,6 +149,11 @@ lval* builtin_cons(lenv* e, lval* a);
 lval* builtin_len(lenv* e, lval* a);
 lval* builtin_init(lenv* e, lval* a);
 
+lval* builtin_logic(lenv* e, lval* a, char* op);
+lval* builtin_and(lenv* e, lval* a);
+lval* builtin_or(lenv* e, lval* a);
+lval* builtin_not(lenv* e, lval* a);
+
 lval* builtin_cmp(lenv* e, lval* a, char* op);
 lval* builtin_eq(lenv* e, lval* a);
 lval* builtin_ne(lenv* e, lval* a);
@@ -156,9 +162,6 @@ lval* builtin_gt(lenv* e, lval* a);
 lval* builtin_lt(lenv* e, lval* a);
 lval* builtin_ge(lenv* e, lval* a);
 lval* builtin_le(lenv* e, lval* a);
-lval* builtin_and(lenv* e, lval* a);
-lval* builtin_or(lenv* e, lval* a);
-lval* builtin_not(lenv* e, lval* a);
 
 lval* builtin_eval(lenv* e, lval* a);
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func);
@@ -171,6 +174,13 @@ lval* lval_num(long x){
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_NUM;
     v->num = x;
+    return v;
+}
+
+lval* lval_bool(short x){
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_BOOL;
+    v->bool = x;
     return v;
 }
 
@@ -859,6 +869,52 @@ lval* builtin_mod(lenv* e, lval* a){
     return builtin_op(e,a,"%");
 }
 
+lval* builtin_logic(lenv* e, lval* a, char* op){
+    /* Ensure all arguments are numbers */
+    for(int i=0;i<a->count;i++){
+        LASSERT_TYPE(op,a,i,LVAL_NUM);
+    }
+
+    if ((strcmp(op,"!") == 0) && a->count != 0){
+        LASSERT_NUM(op,a,1);
+    }
+
+    /*Pop the first element*/
+    lval* x = lval_pop(a,0);
+
+    /*If no arguments and subexpressions perform unary negation*/
+    int r = x->num;
+
+    if((strcmp(op,"!") == 0) && a->count == 0){
+        r = !(r);
+    }
+
+    /*While there are still elements remaining*/
+    while(a->count > 0){
+        /*Pop the next element*/
+        lval* y = lval_pop(a,0);
+        if(strcmp(op,"&&")==0){ r = (r && y->num);}
+        if(strcmp(op,"||")==0){ r = (r || y->num);}
+        lval_del(y);
+    }
+    
+    lval_del(x);
+    lval_del(a); 
+    return lval_num(r);
+}
+
+lval* builtin_and(lenv* e, lval* a){
+    return builtin_logic(e,a,"&&");
+}
+
+lval* builtin_or(lenv* e, lval* a){
+    return builtin_logic(e,a,"||");
+}
+
+lval* builtin_not(lenv* e, lval* a){
+    return builtin_logic(e,a,"!");
+}
+
 lval* builtin_cmp(lenv* e, lval* a, char* op){
     LASSERT_NUM(op, a, 2);
     int r;
@@ -910,18 +966,6 @@ lval* builtin_ge(lenv* e, lval* a){
 
 lval* builtin_le(lenv* e, lval* a){
     return builtin_ord(e,a,"<=");
-}
-
-lval* builtin_and(lenv* e, lval* a){
-    return builtin_(e,a,"&&");
-}
-
-lval* builtin_or(lenv* e, lval* a){
-    return builtin_ord(e,a,"||");
-}
-
-lval* builtin_not(lenv* e, lval* a){
-    return builtin_ord(e,a,"!");
 }
 
 lval* builtin_list(lenv* e, lval* a){
@@ -1061,11 +1105,11 @@ void lenv_add_builtins(lenv* e){
     lenv_add_builtin(e,"<",builtin_lt);
     lenv_add_builtin(e,">=",builtin_ge);
     lenv_add_builtin(e,"<=",builtin_le);
-    
-    /*
+
+    /* Logical Functions */
     lenv_add_builtin(e,"&&",builtin_and);
     lenv_add_builtin(e,"||",builtin_or);
-    lenv_add_builtin(e,"^",builtin_xor);*/
+    lenv_add_builtin(e,"!",builtin_not);
 
 }
 
@@ -1113,6 +1157,7 @@ lval* lval_eval(lenv* e, lval* v){
 
 int main(int argc, char** argv){
     mpc_parser_t* Number = mpc_new("number");
+    mpc_parser_t* Bool = mpc_new("bool");
     mpc_parser_t* Symbol = mpc_new("symbol");
     mpc_parser_t* Sexpr = mpc_new("sexpr");
     mpc_parser_t* Qexpr = mpc_new("qexpr");
@@ -1122,13 +1167,14 @@ int main(int argc, char** argv){
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                                       \
         number : /-?[0-9]+/ ;                               \
-        symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/;          \
+        bool   : \"true\" | \"false\";                      \
+        symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;         \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
         expr   :  <number> | <symbol> | <sexpr> | <qexpr> ; \
         lispy  : /^/<expr>*/$/ ;                            \
     ",
-    Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    Number, Bool, Symbol, Sexpr, Qexpr, Expr, Lispy);
 
     lenv* e = lenv_new();
     lenv_add_builtins(e);
@@ -1166,6 +1212,6 @@ int main(int argc, char** argv){
     }
 
     lenv_del(e);
-    mpc_cleanup(6,Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    mpc_cleanup(7,Number, Bool, Symbol, Sexpr, Qexpr, Expr, Lispy);
     return 0;
 }
