@@ -10,7 +10,7 @@ valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 
 Pesara Amarasekera
 2019-07-21
 
-In this file functions conditionals are designed
+In this file Strings are finally implemented
 */
 
 #include "mpc.h"
@@ -64,7 +64,7 @@ struct lenv;
 typedef struct lval lval; 
 typedef struct lenv lenv;
 
-enum { LVAL_ERR, LVAL_NUM, LVAL_SYM,
+enum { LVAL_ERR, LVAL_NUM, LVAL_SYM, LVAL_STR,
        LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR};
 
 typedef lval* (*lbuiltin) (lenv*, lval*);
@@ -76,6 +76,7 @@ struct lval{
     long num;
     char* sym;
     char* err;
+    char* str;
 
     /* Function */
     lbuiltin builtin;
@@ -98,6 +99,7 @@ struct lenv{
 lval* lval_num(long x);
 lval* lval_err(char* fmt, ...);
 lval* lval_sym(char* s);
+lval* lval_str(char* s);
 lval* lval_sexpr(void);
 lval* lval_qexpr(void);
 lval* lval_fun(lbuiltin func);
@@ -106,8 +108,10 @@ void lval_del(lval* v);
 lval* lval_copy(lval* v);
 lval* lval_read_num(mpc_ast_t* t);
 lval* lval_add(lval* v,lval* x);
+lval* lval_read_str(mpc_ast_t* t);
 lval* lval_read(mpc_ast_t* t);
 void lval_expr_print(lval* v,char open, char close);
+void lval_print_str(lval* v);
 void lval_print(lval* v);
 void lval_println(lval* v);
 lval* lval_pop(lval* v, int i);
@@ -209,6 +213,15 @@ lval* lval_sym(char* s){
     return v;
 }
 
+/* Construct a pointer to a String */
+lval* lval_str(char* s){
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_STR;
+    v->str = malloc(strlen(s)+1);
+    strcpy(v->str,s);
+    return v;
+}
+
 /* Sexpr pointer constructor */
 lval* lval_sexpr(void){
     lval* v = malloc(sizeof(lval));
@@ -247,7 +260,7 @@ int lval_eq(lval* x, lval* y){
         /* Compare String Values */
         case LVAL_ERR: return (strcmp(x->err,y->err) == 0);
         case LVAL_SYM: return (strcmp(x->sym,y->sym) == 0);
-
+        case LVAL_STR: return (strcmp(x->str,y->str) == 0);
         /* If builtin compare, otherwise compare formals and body */
         case LVAL_FUN:
             if (x->builtin || y->builtin){
@@ -299,7 +312,9 @@ lval* lval_copy(lval* v){
         case LVAL_SYM:
             x->sym = malloc(strlen(v->sym)+1);
             strcpy(x->sym,v->sym); break;
-        
+        case LVAL_STR:
+            x->str = malloc(strlen(v->str) + 1);
+            strcpy(x->str,v->str); break;
         /* Copy Lists by copying each sub-expression */
         case LVAL_SEXPR:
         case LVAL_QEXPR:
@@ -325,7 +340,7 @@ void lval_del(lval* v){
         break;
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
-
+        case LVAL_STR: free(v->str); break;
         /*If Qexpr or Sexpr then delete all elements inside*/
         case LVAL_QEXPR:
         case LVAL_SEXPR:
@@ -353,10 +368,26 @@ lval* lval_add(lval* v,lval* x){
     return v;
 }
 
+lval* lval_read_str(mpc_ast_t* t){
+    /* Cut off the final quote character */
+    t->contents[strlen(t->contents)-1] = '\0';
+    /* Copy the string missing out the first quote character */
+    char* unescaped = malloc(strlen(t->contents+1)+1);
+    strcpy(unescaped, t->contents+1);
+    /* Pass through the unescape function */
+    unescaped = mpcf_unescape(unescaped);
+    /* Construct a new lval using the string */
+    lval* str = lval_str(unescaped);
+    /* Free the string and return */
+    free(unescaped);
+    return str;
+}
+
 lval* lval_read(mpc_ast_t* t){
     /*If Symbol or Number return conversion to that type*/
     if(strstr(t->tag,"number")) {return lval_read_num(t);}
     if(strstr(t->tag,"symbol")) {return lval_sym(t->contents);}
+    if(strstr(t->tag,"string")) {return lval_read_str(t);}
 
     /*If root(>), sexpr, or qexpr then create empty list*/
     lval* x = NULL;
@@ -391,11 +422,24 @@ void lval_expr_print(lval* v,char open, char close){
     putchar(close);
 }
 
+void lval_print_str(lval* v){
+    /* Make a Copy of the string */
+    char* escaped = malloc(strlen(v->str)+1);
+    strcpy(escaped, v->str);
+    /* Pass it through the escape function */
+    escaped = mpcf_escape(escaped);
+    /* Print it between " characters */
+    printf("\"%s\"", escaped);
+    /* free the copied string */
+    free(escaped);
+}
+
 void lval_print(lval* v){
     switch (v->type) {
         case LVAL_NUM: printf("%li",v->num); break;
         case LVAL_ERR: printf("Error: %s",v->err); break;
         case LVAL_SYM: printf("%s", v->sym); break;
+        case LVAL_STR: lval_print_str(v); break;
         case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
         case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
         case LVAL_FUN: 
@@ -468,6 +512,7 @@ char* ltype_name(int t){
         case LVAL_NUM: return "Number";
         case LVAL_ERR: return "Error";
         case LVAL_SYM: return "Symbol";
+        case LVAL_STR: return "String";
         case LVAL_SEXPR: return "S-Expression";
         case LVAL_QEXPR: return "Q-Expression";
         default: return "Unknown";
@@ -1148,6 +1193,7 @@ lval* lval_eval(lenv* e, lval* v){
 int main(int argc, char** argv){
     mpc_parser_t* Number = mpc_new("number");
     mpc_parser_t* Symbol = mpc_new("symbol");
+    mpc_parser_t* String = mpc_new("string");
     mpc_parser_t* Sexpr = mpc_new("sexpr");
     mpc_parser_t* Qexpr = mpc_new("qexpr");
     mpc_parser_t* Expr = mpc_new("expr");
@@ -1157,17 +1203,19 @@ int main(int argc, char** argv){
     "                                                       \
         number : /-?[0-9]+/ ;                               \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;         \
+        string : /\"(\\\\.|[^\"])*\"/;                      \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
-        expr   :  <number> | <symbol> | <sexpr> | <qexpr> ; \
+        expr   :  <number> | <symbol> | <string>            \
+               | <sexpr> | <qexpr> ;                        \
         lispy  : /^/<expr>*/$/ ;                            \
     ",
-    Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
 
     lenv* e = lenv_new();
     lenv_add_builtins(e);
 
-    puts("Lispy version 0.0.0.0.10"); 
+    puts("Lispy version 0.0.0.1.0"); 
     puts("Press Ctrl-c to Exit\n");
 
     int state =  1;
@@ -1200,6 +1248,6 @@ int main(int argc, char** argv){
     }
 
     lenv_del(e);
-    mpc_cleanup(6,Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    mpc_cleanup(7,Number, Symbol, String, Sexpr, Qexpr, Expr, Lispy);
     return 0;
 }
