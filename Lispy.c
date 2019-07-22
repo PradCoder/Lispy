@@ -4,10 +4,10 @@ Linux
 cc -std=c99 -Wall -ggdb Lispy.c mpc.c -ledit -lm -o Lispy
 
 Windows
-cc -std=c99 -Wall -ggdb prompts.c mpc.c -prompts
+cc -std=c99 -Wall -ggdb Lispy.c mpc.c -o Lispy
 
 For memory checks using valgrind:
-valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./chapter12Funcs
+valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./Lispy
 
 For more debugging use gdb
 
