@@ -2,7 +2,7 @@
 A lisp built by following "Build your own lisp" by Daniel Holden.
 
 ## Lispy in Action
-![Lispy in Action](images/Screenshot (3).png)
+![Lispy in Action](images/ScreenshotLispy.png)
 
 ## Further steps
 I'm planning on using what I've done hear to implement a completely new language on my own.
