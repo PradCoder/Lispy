@@ -1,11 +1,18 @@
 /*
+For Compiling:
 Linux
-cc -std=c99 -Wall -ggdb prompt.c mpc.c -ledit -lm -o prompt
+cc -std=c99 -Wall -ggdb Lispy.c mpc.c -ledit -lm -o Lispy
 
 Windows
 cc -std=c99 -Wall -ggdb prompts.c mpc.c -prompts
 
+For memory checks using valgrind:
 valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./chapter12Funcs
+
+For more debugging use gdb
+
+For Loading in prompt:
+Input> "file.lspy"
 
 Pesara Amarasekera
 2019-07-21
