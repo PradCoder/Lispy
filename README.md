@@ -1,5 +1,5 @@
 # Lispy
-A lisp built by following "Build your own lisp" by Daniel Holden.
+A lisp built by following "Build your own lisp" by Daniel Holden. My updates will eventually veer away from Lispy and become more different.
 
 ## Lispy in Action
 ![Lispy in Action](images/ScreenshotLispy.png)
