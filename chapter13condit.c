@@ -11,6 +11,8 @@ Pesara Amarasekera
 2019-07-21
 
 In this file functions conditionals are designed
+
+TODO: Implement Booleans
 */
 
 #include "mpc.h"
@@ -74,7 +76,6 @@ struct lval{
 
     /* Basic */
     long num;
-    short bool;
     char* sym;
     char* err;
 
@@ -150,6 +151,8 @@ lval* builtin_len(lenv* e, lval* a);
 lval* builtin_init(lenv* e, lval* a);
 
 lval* builtin_logic(lenv* e, lval* a, char* op);
+lval* builtin_true(lenv* e,lval* a);
+lval* builtin_false(lenv* e,lval* a);
 lval* builtin_and(lenv* e, lval* a);
 lval* builtin_or(lenv* e, lval* a);
 lval* builtin_not(lenv* e, lval* a);
@@ -180,7 +183,7 @@ lval* lval_num(long x){
 lval* lval_bool(short x){
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_BOOL;
-    v->bool = x;
+    v->num = x;
     return v;
 }
 
@@ -252,6 +255,8 @@ int lval_eq(lval* x, lval* y){
         /* Compare Number values */
         case LVAL_NUM: return (x->num == y->num);
         
+        /* Compare Booleans */
+        case LVAL_BOOL: return (x->num == y->num);
         /* Compare String Values */
         case LVAL_ERR: return (strcmp(x->err,y->err) == 0);
         case LVAL_SYM: return (strcmp(x->sym,y->sym) == 0);
@@ -298,7 +303,7 @@ lval* lval_copy(lval* v){
             }
         break;
         case LVAL_NUM: x->num = v->num; break;
-
+        case LVAL_BOOL: x->num = v->num; break;
         /* Copy Strings using malloc and strcpy */
         case LVAL_ERR:
             x->err = malloc(strlen(v->err)+1);
@@ -324,6 +329,7 @@ lval* lval_copy(lval* v){
 void lval_del(lval* v){
     switch (v->type){
         case LVAL_NUM: break;
+        case LVAL_BOOL: break;
         case LVAL_FUN: 
             if(!v->builtin){
                 lenv_del(v->env);
@@ -354,6 +360,17 @@ lval* lval_read_num(mpc_ast_t* t){
         lval_num(x) : lval_err("invalid number");
 }
 
+lval* lval_read_bool(mpc_ast_t* t){
+    errno = 0;
+    if (errno == ERANGE){
+        return lval_err("invalid bool");
+    }
+    if(strcmp(t->contents,"true") == 0){
+        return lval_bool(1);
+    }
+    return lval_bool(0);
+}
+
 lval* lval_add(lval* v,lval* x){
     v->count++;
     v->cell = realloc(v->cell,sizeof(lval*) * v->count);
@@ -364,6 +381,7 @@ lval* lval_add(lval* v,lval* x){
 lval* lval_read(mpc_ast_t* t){
     /*If Symbol or Number return conversion to that type*/
     if(strstr(t->tag,"number")) {return lval_read_num(t);}
+    if(strstr(t->tag,"bool")) {return lval_read_bool(t);}
     if(strstr(t->tag,"symbol")) {return lval_sym(t->contents);}
 
     /*If root(>), sexpr, or qexpr then create empty list*/
@@ -406,6 +424,13 @@ void lval_print(lval* v){
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_SEXPR: lval_expr_print(v,'(',')'); break;
         case LVAL_QEXPR: lval_expr_print(v,'{','}'); break;
+        case LVAL_BOOL: 
+            if(v->num){
+                printf("true");
+            }else{
+                printf("false");
+            }
+        break;
         case LVAL_FUN: 
             if(v->builtin){
                 printf("<builtin>");
@@ -474,6 +499,7 @@ char* ltype_name(int t){
     switch(t){
         case LVAL_FUN: return "Function";
         case LVAL_NUM: return "Number";
+        case LVAL_BOOL: return "Boolean";
         case LVAL_ERR: return "Error";
         case LVAL_SYM: return "Symbol";
         case LVAL_SEXPR: return "S-Expression";
@@ -500,8 +526,6 @@ void lenv_del(lenv* e){
     free(e->vals);
     free(e);
 }
-
-
 
 lval* lval_lambda(lval* formals, lval* body){
     lval* v = malloc(sizeof(lval));
@@ -706,7 +730,8 @@ lval* builtin_var(lenv* e, lval* a, char* func){
             strcmp("init",syms->cell[i]->sym) != 0 && strcmp("len",syms->cell[i]->sym) != 0 && strcmp("def",syms->cell[i]->sym) != 0 &&
             strcmp("head",syms->cell[i]->sym) != 0 && strcmp("+",syms->cell[i]->sym) != 0 && strcmp("-",syms->cell[i]->sym) != 0 &&
             strcmp("*",syms->cell[i]->sym) != 0 && strcmp("/",syms->cell[i]->sym) != 0 && strcmp("%",syms->cell[i]->sym) != 0 &&
-            strcmp("=",syms->cell[i]->sym) != 0 && strcmp("\\",syms->cell[i]->sym) != 0 && strcmp("fun",syms->cell[i]->sym) != 0),
+            strcmp("=",syms->cell[i]->sym) != 0 && strcmp("\\",syms->cell[i]->sym) != 0 && strcmp("fun",syms->cell[i]->sym) != 0 &&
+            strcmp("false",syms->cell[i]->sym) != 0 && strcmp("true",syms->cell[i]->sym) != 0),
             "Redefinition of '%s' is not allowed",syms->cell[i]->sym);
 
             lenv_def(e, syms->cell[i], a->cell[i+1]);
@@ -732,6 +757,11 @@ lval* builtin_put(lenv* e, lval* a){
 lval* builtin_if(lenv* e, lval* a){
     /* Check Two arguments, each of which are Q-Expressions */
     LASSERT_NUM("if",a,3);
+
+    if(a->cell[0]->type == LVAL_BOOL){
+        a->type = LVAL_NUM;
+    }
+
     LASSERT_TYPE("if",a,0,LVAL_NUM);
     LASSERT_TYPE("if",a,1,LVAL_QEXPR);
     LASSERT_TYPE("if",a,2,LVAL_QEXPR);
@@ -870,8 +900,12 @@ lval* builtin_mod(lenv* e, lval* a){
 }
 
 lval* builtin_logic(lenv* e, lval* a, char* op){
+
     /* Ensure all arguments are numbers */
     for(int i=0;i<a->count;i++){
+        if(a->cell[i]->type == LVAL_BOOL){
+            a->type = LVAL_NUM;
+        }
         LASSERT_TYPE(op,a,i,LVAL_NUM);
     }
 
@@ -901,6 +935,14 @@ lval* builtin_logic(lenv* e, lval* a, char* op){
     lval_del(x);
     lval_del(a); 
     return lval_num(r);
+}
+
+lval* builtin_true(lenv* e, lval* a){
+    return builtin_logic(e,a,"true");
+}
+
+lval* builtin_false(lenv* e,lval* a){
+    return builtin_logic(e,a,"false");
 }
 
 lval* builtin_and(lenv* e, lval* a){
@@ -1111,6 +1153,9 @@ void lenv_add_builtins(lenv* e){
     lenv_add_builtin(e,"||",builtin_or);
     lenv_add_builtin(e,"!",builtin_not);
 
+    /* Logical Values */
+    /*lenv_add_builtin(e,"true",builtin_true);
+    lenv_add_builtin(e,"false",builtin_false);*/
 }
 
 lval* lval_eval_sexpr(lenv* e,lval* v){
@@ -1197,8 +1242,8 @@ int main(int argc, char** argv){
         }
 
         if(mpc_parse("<stdin>",input,Lispy,&r)){
-
             lval* x = lval_eval(e, lval_read(r.output));
+            
             lval_println(x);
             lval_del(x);
 
