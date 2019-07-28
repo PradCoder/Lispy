@@ -758,11 +758,11 @@ lval* builtin_if(lenv* e, lval* a){
     /* Check Two arguments, each of which are Q-Expressions */
     LASSERT_NUM("if",a,3);
 
-    if(a->cell[0]->type == LVAL_BOOL){
+    if(a->cell[0]->type == LVAL_BOOL || ( a->cell[0]->num >= 0 && a->cell[0]->type == LVAL_FUN)){
         a->type = LVAL_NUM;
     }
 
-    LASSERT_TYPE("if",a,0,LVAL_NUM);
+    /*LASSERT_TYPE("if",a,0,LVAL_NUM); */
     LASSERT_TYPE("if",a,1,LVAL_QEXPR);
     LASSERT_TYPE("if",a,2,LVAL_QEXPR);
 
@@ -771,6 +771,7 @@ lval* builtin_if(lenv* e, lval* a){
     a->cell[1]->type = LVAL_SEXPR;
     a->cell[2]->type = LVAL_SEXPR;
 
+    printf("%li",a->cell[0]->num);
     if(a->cell[0]->num){
         /* If condition is true evaluate first expression */
         x = lval_eval(e,lval_pop(a,1));
@@ -1154,8 +1155,8 @@ void lenv_add_builtins(lenv* e){
     lenv_add_builtin(e,"!",builtin_not);
 
     /* Logical Values */
-    /*lenv_add_builtin(e,"true",builtin_true);
-    lenv_add_builtin(e,"false",builtin_false);*/
+    lenv_add_builtin(e,"true",builtin_true);
+    lenv_add_builtin(e,"false",builtin_false);
 }
 
 lval* lval_eval_sexpr(lenv* e,lval* v){
@@ -1202,7 +1203,6 @@ lval* lval_eval(lenv* e, lval* v){
 
 int main(int argc, char** argv){
     mpc_parser_t* Number = mpc_new("number");
-    mpc_parser_t* Bool = mpc_new("bool");
     mpc_parser_t* Symbol = mpc_new("symbol");
     mpc_parser_t* Sexpr = mpc_new("sexpr");
     mpc_parser_t* Qexpr = mpc_new("qexpr");
@@ -1212,14 +1212,13 @@ int main(int argc, char** argv){
     mpca_lang(MPCA_LANG_DEFAULT,
     "                                                       \
         number : /-?[0-9]+/ ;                               \
-        bool   : \"true\" | \"false\";                      \
         symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;         \
         sexpr  : '(' <expr>* ')' ;                          \
         qexpr  : '{' <expr>* '}' ;                          \
         expr   :  <number> | <symbol> | <sexpr> | <qexpr> ; \
         lispy  : /^/<expr>*/$/ ;                            \
     ",
-    Number, Bool, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
 
     lenv* e = lenv_new();
     lenv_add_builtins(e);
@@ -1242,6 +1241,7 @@ int main(int argc, char** argv){
         }
 
         if(mpc_parse("<stdin>",input,Lispy,&r)){
+            mpc_ast_print(r.output);
             lval* x = lval_eval(e, lval_read(r.output));
             
             lval_println(x);
@@ -1257,6 +1257,6 @@ int main(int argc, char** argv){
     }
 
     lenv_del(e);
-    mpc_cleanup(7,Number, Bool, Symbol, Sexpr, Qexpr, Expr, Lispy);
+    mpc_cleanup(6,Number, Symbol, Sexpr, Qexpr, Expr, Lispy);
     return 0;
 }
