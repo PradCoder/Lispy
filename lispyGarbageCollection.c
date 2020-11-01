@@ -7,7 +7,8 @@ typedef enum {
 typedef struct sObject {
   unsigned char marked;
   ObjectType type;
-
+  struct sObject* next;
+  
   union {
     /* OBJ_INT */
     int value;
@@ -47,6 +48,12 @@ Object* pop(VM* vm) {
 Object* newObject(VM* vm, ObjectType type) {
   Object* object = malloc(sizeof(Object));
   object->type = type;
+  object->marked = 0;
+
+  /*Insert it into the list of allocated objects. */
+  object->next = vm->firstObject;
+  vm->firstObject = object;
+  
   return object;
 }
 
@@ -81,4 +88,24 @@ void mark(Object* object) {
     mark(object->head);
     mark(object->tail);
   }
+}
+
+void sweep(VM* vm){
+  Object** object = &vm->firstObject;
+  while (*object){
+    if(!(*object)->marked){
+      Object* unreached = *object;
+
+      *object = unreached->next;
+      free(unreached);
+    } else {
+      (*object)->marked = 0;
+      object = &(*object)->next;
+    }
+  }
+}
+
+void gc(VM* vm) {
+  markAll(vm);
+  sweep(vm);
 }
