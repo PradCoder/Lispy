@@ -25,6 +25,10 @@ typedef struct sObject {
 #define STACK_MAX 256
 
 typedef struct {
+  /*The total number of currently allocated objects*/
+  int numObjects;
+  /*The number of objects required to trigger a GC */
+  int maxObjects;
   Object* stack[STACK_MAX];
   int stackSize;
 } VM;
@@ -32,6 +36,8 @@ typedef struct {
 VM* newVM() {
   VM* vm = malloc(sizeof(VM));
   vm->stackSize = 0;
+  vm->numObjects = 0;
+  vm->maxObjects = INITIAL_GC_THRESHOLD;
   return vm;
 }
 
@@ -46,6 +52,8 @@ Object* pop(VM* vm) {
 }
 
 Object* newObject(VM* vm, ObjectType type) {
+  if (vm->numObjects == vm->maxObjects) gc(vm);
+  
   Object* object = malloc(sizeof(Object));
   object->type = type;
   object->marked = 0;
@@ -53,7 +61,8 @@ Object* newObject(VM* vm, ObjectType type) {
   /*Insert it into the list of allocated objects. */
   object->next = vm->firstObject;
   vm->firstObject = object;
-  
+
+  vm->numObjects++;
   return object;
 }
 
@@ -106,6 +115,10 @@ void sweep(VM* vm){
 }
 
 void gc(VM* vm) {
+  int numObjects = vm->numObjects;
+  
   markAll(vm);
   sweep(vm);
+
+  vm->maxObjects = vm->numObjects * 2;
 }
