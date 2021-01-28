@@ -42,7 +42,7 @@ the functionality and implementation shall be modified iteratively
     char* add_history(char* unused){}
 #else
     #include <editline/readline.h>
-    #include <editline/history.h>
+//    #include <editline/history.h>
 #endif
 
 #define LASSERT(args,cond, fmt, ...) \

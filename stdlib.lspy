@@ -130,7 +130,7 @@
 })
 
 ; Fibonacci
-(fun {fin n} {
+(fun {fib n} {
     select
         { (== n 0) 0 }
         { (== n 1) 1 }
