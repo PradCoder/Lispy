@@ -1,2 +1,0 @@
-## Images
-- Screenshot of Input
