@@ -1,5 +1,5 @@
 # Lispy
-A lisp built by following ["Build your own lisp"](http://buildyourownlisp.com) by Daniel Holden. My updates will eventually veer away from Lispy and become more different.
+A lisp built by following ["Build your own Lisp"](http://buildyourownlisp.com) by Daniel Holden. My updates will eventually veer away from Lispy and become more different.
 
 ## Lispy in Action
 To see Lispy in action use `compileLispy.sh` (you will first have change permissions for this file).The executable `Lispy` will be generated. I've written the Bash script to make use of the `cc` compiler, if you have `gcc` you can change the initial `cc` to `gcc` to compile.
