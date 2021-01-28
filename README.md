@@ -1,5 +1,5 @@
 # Lispy
-A lisp built by following "Build your own lisp" by Daniel Holden. My updates will eventually veer away from Lispy and become more different.
+A lisp built by following ["Build your own lisp"](http://buildyourownlisp.com) by Daniel Holden. My updates will eventually veer away from Lispy and become more different.
 
 ## Lispy in Action
 To see Lispy in action use `compileLispy.sh` (you will first have change permissions for this file).The executable `Lispy` will be generated. I've written the Bash script to make use of the `cc` compiler, if you have `gcc` you can change the initial `cc` to `gcc` to compile.
@@ -34,7 +34,7 @@ Input> fib 3
 2
 ```
 
-The syntax for Lispy is almost the same as Common-Lisp (look at the `.lspy` files to understand the syntax).
+The syntax for Lispy is almost the same as Common-Lisp (look at the `.lspy` files to understand the syntax). **PLEASE NOTE** Lispy is very picky about white-space so make sure to get the spacing right!.
 
 ## Further steps
 I'm planning on using what I've done here to implement a completely new language on my own. As you might've noticed Garbage Collection is currently being worked on.
